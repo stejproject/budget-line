@@ -1405,7 +1405,7 @@ function goToGoogleForm() {
 
     let config = {
         title: 'Budget-Line',
-        entity: 'Nama Mitra/Agen',
+        entity: 'Keterangan',
         metricA: 'Pendapatan',
         metricB: 'Biaya Operasional',
         optimal: 20,
@@ -1483,7 +1483,7 @@ function goToGoogleForm() {
         sheetIdCounter++;
         return {
             id: 'sheet_' + sheetIdCounter,
-            name: name || ('Sheet' + sheetIdCounter),
+            name: name || ('Nama Mitra/Agen' + sheetIdCounter),
             data: [makeEmptyRow()],
             formulaHistory: []
         };
