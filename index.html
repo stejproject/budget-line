@@ -1129,7 +1129,7 @@
                 <th class="corner"></th>
                 <th>Tanggal</th>
                 <th>Waktu</th>
-                <th id="colEntity">Nama Mitra/Agen</th>
+                <th id="colEntity">Keterangan</th>
                 <th id="colMetricA">Pendapatan</th>
                 <th id="colMetricB">Biaya Operasional</th>
                 <th>Rasio (%)</th>
@@ -1145,7 +1145,7 @@
 <!-- Status Bar -->
 <div class="status-bar">
     <div class="status-left">
-        <div class="status-item">📋 <span id="activeSheetLabel">Sheet1</span></div>
+        <div class="status-item">📋 <span id="activeSheetLabel">Mitra/Agen 1</span></div>
         <div class="status-item" id="recordCount">0 records</div>
         <div class="status-indicator" id="calcStatus"></div>
         <div class="status-indicator" id="formulaCount">0 formulas</div>
@@ -1178,7 +1178,7 @@
             <h3>📋 Label Kolom (berlaku untuk semua sheet)</h3>
             <div class="config-input">
                 <label>Kolom Entitas (Kolom C)</label>
-                <input type="text" id="cfgEntity" value="Nama Mitra/Agen">
+                <input type="text" id="cfgEntity" value="Keterangan">
             </div>
             <div class="config-input">
                 <label>Kolom Metrik A (Kolom D)</label>
@@ -1249,7 +1249,7 @@
 <!-- Rekap per Entitas Panel (mirip rekap buku besar per akun di Zahir) -->
 <div class="rekap-panel" id="rekapPanel">
     <h4>
-        <span>📑 Rekap per Entitas — <span id="rekapSheetName">Sheet1</span></span>
+        <span>📑 Rekap per Entitas — <span id="rekapSheetName">Mitra/Agen 1</span></span>
         <button class="close-btn" style="width:24px;height:24px;font-size:16px;" onclick="toggleRekap()">×</button>
     </h4>
     <div class="rekap-table-wrap">
@@ -1483,7 +1483,7 @@ function goToGoogleForm() {
         sheetIdCounter++;
         return {
             id: 'sheet_' + sheetIdCounter,
-            name: name || ('Nama Mitra/Agen' + sheetIdCounter),
+            name: name || ('Mitra/Agen ' + sheetIdCounter),
             data: [makeEmptyRow()],
             formulaHistory: []
         };
@@ -1634,8 +1634,8 @@ function goToGoogleForm() {
         DOM.paywallOverlay = document.getElementById('paywallOverlay');
         DOM.trialBanner = document.getElementById('trialBanner');
 
-        // Mulai dengan satu sheet default
-        const firstSheet = createSheet('Sheet1');
+        // Mulai dengan satu sheet default (nama otomatis "Mitra/Agen 1")
+        const firstSheet = createSheet();
         sheets.push(firstSheet);
         activeSheetId = firstSheet.id;
         data = firstSheet.data;
@@ -2979,7 +2979,7 @@ function goToGoogleForm() {
                         });
                         return {
                             id: s.id || ('sheet_' + sheetIdCounter),
-                            name: s.name || ('Sheet' + sheetIdCounter),
+                            name: s.name || ('Mitra/Agen ' + sheetIdCounter),
                             data: rows.length ? rows : [makeEmptyRow()],
                             formulaHistory: s.formulaHistory || []
                         };
