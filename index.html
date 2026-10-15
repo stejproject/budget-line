@@ -1134,6 +1134,8 @@
                 <th id="colMetricB">Biaya Operasional</th>
                 <th>Rasio (%)</th>
                 <th>Status</th>
+                <th>Saldo Sebelumnya</th>
+                <th>Saldo</th>
             </tr>
         </thead>
         <tbody id="gridBody">
@@ -1475,6 +1477,8 @@ function goToGoogleForm() {
             metricB: 0,
             rasio: 0,
             status: 'BALANCED',
+            saldoSebelumnya: 0,
+            saldo: 0,
             _formulas: {}
         };
     }
@@ -1666,13 +1670,7 @@ function goToGoogleForm() {
                     _formulas: {}
                 };
                 data.push(newRow);
-                if (config.autoCalc) {
-                    const lastIdx = data.length - 1;
-                    const rasio = ((newRow.metricB - newRow.metricA) / newRow.metricA) * 100;
-                    data[lastIdx].rasio = isFinite(rasio) ? parseFloat(rasio.toFixed(2)) : 0;
-                    data[lastIdx].status = data[lastIdx].rasio < config.critical ? 'CRITICAL' :
-                                         data[lastIdx].rasio > config.optimal ? 'OPTIMAL' : 'BALANCED';
-                }
+                recalculateAll();
                 syncActiveSheetIntoStore();
                 requestRender();
                 showToast(`📥 Data Baru masuk ke "${getActiveSheet().name}": ${newRow.entity}`, 'success');
@@ -1733,7 +1731,9 @@ function goToGoogleForm() {
                 { key: 'metricA', type: 'number', class: 'cell-number' },
                 { key: 'metricB', type: 'number', class: 'cell-number' },
                 { key: 'rasio', type: 'calc', class: 'cell-number', readOnly: true },
-                { key: 'status', type: 'calc', class: '', readOnly: true }
+                { key: 'status', type: 'calc', class: '', readOnly: true },
+                { key: 'saldoSebelumnya', type: 'money', class: 'cell-number', readOnly: true },
+                { key: 'saldo', type: 'money', class: 'cell-number', readOnly: true }
             ];
 
             cells.forEach((cell, colIndex) => {
@@ -1754,6 +1754,11 @@ function goToGoogleForm() {
                                       value === 'CRITICAL' ? 'status-critical' :
                                       value === 'ERROR' ? 'status-error' : 'status-balanced';
                     displayValue = `<span class="status-badge ${badgeClass}">${value}</span>`;
+                }
+
+                if (cell.key === 'saldo' && typeof value === 'number') {
+                    td.style.color = value < 0 ? '#dc2626' : '#16a34a';
+                    td.style.fontWeight = '600';
                 }
 
                 if (cell.key === 'rasio' && typeof value === 'number') {
@@ -1806,6 +1811,10 @@ function goToGoogleForm() {
 
     function formatCellValue(value, type) {
         if (value === undefined || value === null || value === '') return '';
+        if (type === 'money') {
+            const n = parseFloat(value);
+            return isNaN(n) ? '' : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
         if (type === 'number' || type === 'calc') {
             if (typeof value === 'number') {
                 if (Math.abs(value) > 999999) return value.toExponential(2);
@@ -2330,12 +2339,12 @@ function goToGoogleForm() {
 
     function getCellData(row, col) {
         if (row >= data.length || row < 0) return '';
-        const keys = ['tanggal', 'waktu', 'entity', 'metricA', 'metricB', 'rasio', 'status'];
+        const keys = ['tanggal', 'waktu', 'entity', 'metricA', 'metricB', 'rasio', 'status', 'saldoSebelumnya', 'saldo'];
         return data[row][keys[col]] || '';
     }
 
     function setCellData(row, col, value) {
-        const keys = ['tanggal', 'waktu', 'entity', 'metricA', 'metricB', 'rasio', 'status'];
+        const keys = ['tanggal', 'waktu', 'entity', 'metricA', 'metricB', 'rasio', 'status', 'saldoSebelumnya', 'saldo'];
         const key = keys[col];
 
         if (col === 3 || col === 4) {
@@ -2346,22 +2355,39 @@ function goToGoogleForm() {
         }
     }
 
-    function recalculateRow(row) {
+    // Hitung ulang seluruh sheet dari atas ke bawah.
+    // Saldo sebelumnya = saldo baris terakhir dengan Keterangan yang sama (tanpa beda huruf besar/kecil).
+    // Pendapatan efektif = Pendapatan yang diinput + saldo sebelumnya.
+    // Rasio & status dihitung dari Pendapatan efektif; Saldo = Pendapatan efektif - Biaya.
+    function recalculateAll() {
         if (!config.autoCalc) return;
 
-        const r = data[row];
-        const a = parseFloat(r.metricA) || 0;
-        const b = parseFloat(r.metricB) || 0;
+        const saldoMap = {};
+        data.forEach(r => {
+            const key = (r.entity || '').toString().trim().toLowerCase();
+            const prev = key ? (saldoMap[key] || 0) : 0;
+            const a = (parseFloat(r.metricA) || 0) + prev;
+            const b = parseFloat(r.metricB) || 0;
 
-        if (b === 0) {
-            r.rasio = 0;
-            r.status = 'ERROR';
-        } else {
-            r.rasio = ((a - b) / b) * 100;
-            if (r.rasio > config.optimal) r.status = 'OPTIMAL';
-            else if (r.rasio > config.critical) r.status = 'BALANCED';
-            else r.status = 'CRITICAL';
-        }
+            r.saldoSebelumnya = prev;
+            r.saldo = a - b;
+            if (key) saldoMap[key] = r.saldo;
+
+            if (b === 0) {
+                r.rasio = 0;
+                r.status = 'ERROR';
+            } else {
+                r.rasio = ((a - b) / b) * 100;
+                if (r.rasio > config.optimal) r.status = 'OPTIMAL';
+                else if (r.rasio > config.critical) r.status = 'BALANCED';
+                else r.status = 'CRITICAL';
+            }
+        });
+    }
+
+    // Saldo bergantung pada urutan baris, jadi semua pemanggil menghitung ulang satu sheet penuh
+    function recalculateRow() {
+        recalculateAll();
     }
 
     function addRow() {
@@ -2395,6 +2421,7 @@ function goToGoogleForm() {
         }
         data.splice(selectedCell.row, 1);
         if (selectedCell.row >= data.length) selectedCell.row = data.length - 1;
+        recalculateAll();
         syncActiveSheetIntoStore();
         renderGrid();
         showToast('🗑️ Baris dihapus', 'info');
@@ -2478,12 +2505,12 @@ function goToGoogleForm() {
 
     function moveSelection(dRow, dCol) {
         const newRow = Math.max(0, Math.min(data.length - 1, selectedCell.row + dRow));
-        const newCol = Math.max(0, Math.min(6, selectedCell.col + dCol));
+        const newCol = Math.max(0, Math.min(8, selectedCell.col + dCol));
         selectCell(newRow, newCol);
     }
 
     function updateCellReference() {
-        const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+        const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
         DOM.cellRef.textContent = cols[selectedCell.col] + (selectedCell.row + 1);
     }
 
@@ -2579,7 +2606,7 @@ function goToGoogleForm() {
         }
 
         if (config.autoCalc) {
-            data.forEach((_, i) => recalculateRow(i));
+            recalculateAll();
         }
         syncActiveSheetIntoStore();
         renderGrid();
@@ -2877,7 +2904,7 @@ function goToGoogleForm() {
             const row = data[rowIndex];
             if (!row) return;
 
-            const haystack = [row.tanggal, row.waktu, row.entity, row.metricA, row.metricB, row.rasio, row.status]
+            const haystack = [row.tanggal, row.waktu, row.entity, row.metricA, row.metricB, row.rasio, row.status, row.saldoSebelumnya, row.saldo]
                 .map(v => (v === undefined || v === null) ? '' : v.toString().toLowerCase())
                 .join(' | ');
 
@@ -2916,7 +2943,9 @@ function goToGoogleForm() {
                 [config.metricA]: row.metricA,
                 [config.metricB]: row.metricB,
                 'Rasio (%)': (row.rasio || 0).toFixed(2),
-                'Status': row.status
+                'Status': row.status,
+                'Saldo Sebelumnya': row.saldoSebelumnya || 0,
+                'Saldo': row.saldo || 0
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
             const safeName = sanitizeSheetNameForExcel(s.name, usedNames);
@@ -3005,7 +3034,7 @@ function goToGoogleForm() {
                 }
 
                 if (config.autoCalc) {
-                    data.forEach((_, i) => recalculateRow(i));
+                    recalculateAll();
                     syncActiveSheetIntoStore();
                 }
 
