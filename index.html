@@ -2355,23 +2355,23 @@ function goToGoogleForm() {
         }
     }
 
-    // Hitung ulang seluruh sheet dari atas ke bawah.
-    // Saldo sebelumnya = saldo baris terakhir dengan Keterangan yang sama (tanpa beda huruf besar/kecil).
-    // Pendapatan efektif = Pendapatan yang diinput + saldo sebelumnya.
+    // Hitung ulang seluruh sheet dari atas ke bawah (running total global).
+    // Saldo Sebelumnya = total (jumlah) semua saldo baris sebelumnya.
+    // Pendapatan efektif = Pendapatan yang diinput + Saldo Sebelumnya.
     // Rasio & status dihitung dari Pendapatan efektif; Saldo = Pendapatan efektif - Biaya.
+    // Saldo baris ini kemudian menjadi bagian dari total untuk baris berikutnya.
     function recalculateAll() {
         if (!config.autoCalc) return;
 
-        const saldoMap = {};
+        let totalSaldoSebelumnya = 0;
         data.forEach(r => {
-            const key = (r.entity || '').toString().trim().toLowerCase();
-            const prev = key ? (saldoMap[key] || 0) : 0;
+            const prev = totalSaldoSebelumnya;
             const a = (parseFloat(r.metricA) || 0) + prev;
             const b = parseFloat(r.metricB) || 0;
 
             r.saldoSebelumnya = prev;
             r.saldo = a - b;
-            if (key) saldoMap[key] = r.saldo;
+            totalSaldoSebelumnya = r.saldo; // akumulasi total untuk baris berikutnya
 
             if (b === 0) {
                 r.rasio = 0;
